@@ -72,8 +72,13 @@ int main(int argc, char **argv)
 	   return EXIT_FAILURE;
 	}
    
-	fscanf(pFP,"%s %s",uid,pwd);
+	int scnt = fscanf(pFP,"%s %s",uid,pwd);
 	fclose(pFP);
+   if (scnt < 2){
+      puts("Error pulling user credentials");
+      return EXIT_FAILURE;
+   }
+   
    cnxSec.CSPUserIdPtr = uid;                                            
    cnxSec.CSPUserIdLength = strlen(uid);
    cnxSec.CSPPasswordPtr = pwd;
@@ -94,7 +99,7 @@ int main(int argc, char **argv)
    //Open DEV.Q1 for output
    //-------------------------------------------------------
    opnOpt = MQOO_OUTPUT | MQOO_FAIL_IF_QUIESCING;
-   strncpy(objDsc.ObjectName,pQue,strlen(pQue));                                      //Queue = DEV.Q1               
+   strncpy(objDsc.ObjectName,pQue,strlen(pQue)+1);                          //Queue = DEV.Q1; strlen+1 to include the NULL              
    MQOPEN(Hcnx,&objDsc,opnOpt,&Hobj,&opnCde,&resCde);
           
    if (resCde != MQRC_NONE)
@@ -103,8 +108,6 @@ int main(int argc, char **argv)
    if (opnCde == MQCC_FAILED){
       printf("unable to open %s queue for output\n",pQue);
       printf("Disconnecting from %s and exiting\n",pQmg);
-      printf("Press enter to continue\n");
-      getchar();
       MQDISC(&Hcnx,&cmpCde,&resCde);
       return (int)opnCde;
    }
@@ -122,8 +125,6 @@ int main(int argc, char **argv)
    if (pFP == NULL){
 	   fprintf(stderr, "fopen() failed in file %s at line # %d", __FILE__,__LINE__);
       printf("Disconnecting from %s and exiting\n",pQmg);
-      printf("Press enter to continue\n");
-      getchar();
       MQDISC(&Hcnx,&cmpCde,&resCde);
 	   return EXIT_FAILURE;
    }
