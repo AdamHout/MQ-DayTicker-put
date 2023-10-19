@@ -2,8 +2,9 @@
  * mqremoteput - Demo program to send messages to a remote queue
  * 
  * Summary:
+ * Console program to send minute by minute financial indice data to a remote machine via IBM MQ
  * 
- * Resources:
+ * MQ Configuration:
  * +IBM MQ Advanced for Developers on ubuntu machine S1558
  *   -Queue Manager:
  *     -QM_S1558
@@ -16,6 +17,11 @@
  *     -DEV.APP.SVRCONN   - Server-connection
  *     -QM_S1558.QM_E6410 - Sender
  * 
+ * ----------------------------------------------------------------------------------------------
+ * Date       Author        Description
+ * ----------------------------------------------------------------------------------------------
+ * 10/16/23   A. Hout       Original source
+ * ----------------------------------------------------------------------------------------------
 */
 
 #include <stdio.h>
@@ -45,7 +51,13 @@ int main(int argc, char **argv)
    char *pQue = "DEV.Q1";                          //Target queue
    char uid[10];                                   //User ID
    char pwd[10];                                   //User password
+   
+   //File variables
    FILE *pFP;                                      //File handle pointer
+   char *pDataLine = NULL;                         //Indicies data line to transmit
+   size_t len = 0;                                 //Input to getline(); will allocate as needed
+   ssize_t blkLen;                                 //Data Line (block) length returned by getline()
+   int msgCnt = 0;                                 //Count of messages sent
    
    //-------------------------------------------------------
    //Connect to the queue manager
@@ -94,28 +106,44 @@ int main(int argc, char **argv)
       printf("Press enter to continue\n");
       getchar();
       MQDISC(&Hcnx,&cmpCde,&resCde);
-      return((int)opnCde);
+      return (int)opnCde;
    }
    
    //-------------------------------------------------------
-   // Put msgs
+   // Pull data lines from file and place them on DEV.Q1
    //-------------------------------------------------------
+   printf ("Sending Indicie data to %s %s\n", pQue, pQmg);
    memcpy(msgDsc.Format,MQFMT_STRING,(size_t)MQ_FORMAT_LENGTH);            //Char string fmt
    putOpt.Options = MQPMO_NO_SYNCPOINT | MQPMO_FAIL_IF_QUIESCING;
    putOpt.Options |= MQPMO_NEW_MSG_ID;                                     //Unique MQMD.MsgId for each datagram
    putOpt.Options |= MQPMO_NEW_CORREL_ID;
    
-   char *msgBuf = "Test from S1558";
-   int msgLen = 15;
-   MQPUT(Hcnx,Hobj,&msgDsc,&putOpt,msgLen,msgBuf,&cmpCde,&resCde);         //Send to remote queue
+   pFP = fopen("Indicies.csv","r");
+   if (pFP == NULL){
+	   fprintf(stderr, "fopen() failed in file %s at line # %d", __FILE__,__LINE__);
+      printf("Disconnecting from %s and exiting\n",pQmg);
+      printf("Press enter to continue\n");
+      getchar();
+      MQDISC(&Hcnx,&cmpCde,&resCde);
+	   return EXIT_FAILURE;
+   }
    
-   if (resCde != MQRC_NONE){
-      printf("\nMQPUT ended with reason code %d\n",resCde);
+   while ((blkLen = getline(&pDataLine,&len,pFP)) != -1){
+      msgCnt++;
+      MQPUT(Hcnx,Hobj,&msgDsc,&putOpt,blkLen,pDataLine,&cmpCde,&resCde);    
+   
+      if (resCde != MQRC_NONE){
+         printf("\nMQPUT ended with reason code %d\n",resCde);
+      }
    }
    
    //-------------------------------------------------------
-   //Close 
+   //Close the input file and queue connection
    //-------------------------------------------------------
+   fclose(pFP);
+   if (pDataLine)
+      free(pDataLine);
+      
    clsOpt = MQCO_NONE;
    MQCLOSE(Hcnx,&Hobj,clsOpt,&cmpCde,&resCde);
 
@@ -128,6 +156,6 @@ int main(int argc, char **argv)
    if (resCde != MQRC_NONE)
       printf("MQDISC ended with reason code %d\n",resCde);
           
-   printf("\nDisconnected from %s\n",pQue);
+   printf("%d records sent\n",msgCnt);
    return EXIT_SUCCESS;
 }
