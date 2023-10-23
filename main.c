@@ -121,7 +121,7 @@ int main(int argc, char **argv)
    putOpt.Options |= MQPMO_NEW_MSG_ID;                                     //Unique MQMD.MsgId for each datagram
    putOpt.Options |= MQPMO_NEW_CORREL_ID;
    
-   pFP = fopen("Indicies.csv","r");
+   pFP = fopen("/home/adam/Codelite-workspace/mqremoteput/Indices.csv","r");
    if (pFP == NULL){
 	   fprintf(stderr, "fopen() failed in file %s at line # %d", __FILE__,__LINE__);
       printf("Disconnecting from %s and exiting\n",pQmg);
