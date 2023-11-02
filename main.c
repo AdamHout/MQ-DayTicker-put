@@ -22,11 +22,14 @@
  * ----------------------------------------------------------------------------------------------
  * 10/16/23   A. Hout       Original source
  * ----------------------------------------------------------------------------------------------
+ * 11/02/23   A. Hout       Add exception logic to deal with a queue full scenario
+ * ----------------------------------------------------------------------------------------------
 */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <cmqc.h>
 
 int main(int argc, char **argv)
@@ -129,10 +132,23 @@ int main(int argc, char **argv)
 	   return EXIT_FAILURE;
    }
    
+   //Loop thru the dataset
    while ((blkLen = getline(&pDataLine,&len,pFP)) != -1){
       msgCnt++;
       MQPUT(Hcnx,Hobj,&msgDsc,&putOpt,blkLen,pDataLine,&cmpCde,&resCde);    
    
+      if (resCde == MQRC_Q_FULL){                                          //RC 2053
+         printf("Queue %s is full. Retrying at 1 second intervals...\n",pQue);
+         int rcnt = 1;
+         do{
+            sleep(1);
+            MQPUT(Hcnx,Hobj,&msgDsc,&putOpt,blkLen,pDataLine,&cmpCde,&resCde);
+            if (rcnt % 10 == 0){
+               printf("\r%d retry attempts",rcnt++);
+               fflush(stdout);
+            }
+         }while(resCde == MQRC_Q_FULL);
+      }
       if (resCde != MQRC_NONE){
          printf("\nMQPUT ended with reason code %d\n",resCde);
       }
@@ -157,6 +173,6 @@ int main(int argc, char **argv)
    if (resCde != MQRC_NONE)
       printf("MQDISC ended with reason code %d\n",resCde);
           
-   printf("%d records sent\n",msgCnt);
+   printf("\n%d records sent\n",msgCnt);
    return EXIT_SUCCESS;
 }
